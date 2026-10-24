@@ -1,8 +1,10 @@
 {
     "scripts": {
-        "dev": "cd frontend && npm run dev"
+        "dev": "cd frontend && npm run dev",
+        "deploy": "cd frontend && npm run deploy"
     },
     "dependencies": {
-        "env": "^0.0.2"
+        "env": "^0.0.2",
+        "gh-pages": "^6.3.0"
     }
 }
