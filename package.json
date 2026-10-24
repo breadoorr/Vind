@@ -1,0 +1,8 @@
+{
+    "scripts": {
+        "dev": "cd frontend && npm run dev"
+    },
+    "dependencies": {
+        "env": "^0.0.2"
+    }
+}
