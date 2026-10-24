@@ -1,7 +1,7 @@
 
 <script>
   import { onMount } from 'svelte';
-  import { searchVideos } from './lib/youtube.js';
+  import { videos as allVideos } from './lib/videos.js';
 
   let query = $state('');
   let videos = $state([]);
@@ -14,37 +14,79 @@
   let saved = $state([]);
   let darkMode = $state(false);
   let isScrolled = $state(false);
-  let logo = $state("logo-dark.png")
-  
-  onMount(() => { 
-    search();
+  let logo = $state('logo-dark.png');
+
+  onMount(() => {
+    videos = [...allVideos];
 
     const handleScroll = () => {
-    isScrolled = window.scrollY > window.innerHeight * 0.65;
-};
+      isScrolled = window.scrollY > window.innerHeight * 0.65;
+    };
 
-window.addEventListener('scroll', handleScroll, { passive: true });
-handleScroll();
+    window.addEventListener('scroll', handleScroll, {
+      passive: true
+    });
 
-return () => window.removeEventListener('scroll', handleScroll);
-});
+    handleScroll();
 
+    return () => window.removeEventListener('scroll', handleScroll);
+  });
 
   async function search(append = false, term = query) {
     loading = true;
     error = '';
 
     try {
-      const result = await searchVideos(
-        term.trim() || 'popular',
-        append ? nextPageToken : ''
-      );
+      const normalized = term.trim().toLowerCase();
 
-      videos = append
-        ? [...videos, ...result.videos]
-        : result.videos;
+      let matches = allVideos.filter(video => {
+        const searchableText = [
+          video.title,
+          video.description,
+          video.creator,
+          video.category
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
 
-      nextPageToken = result.nextPageToken || '';
+        return !normalized || searchableText.includes(normalized);
+      });
+
+      if (activeTab === 'Trending') {
+        matches.sort(
+          (a, b) => (b.views || 0) - (a.views || 0)
+        );
+      }
+
+      if (sortBy === 'views') {
+        matches.sort(
+          (a, b) => (b.views || 0) - (a.views || 0)
+        );
+      } else if (sortBy === 'newest') {
+        matches.sort(
+          (a, b) =>
+            new Date(b.publishedAt || 0) -
+            new Date(a.publishedAt || 0)
+        );
+      }
+
+      if (append) {
+        const existingIds = new Set(
+          videos.map(video => video.id)
+        );
+
+        videos = [
+          ...videos,
+          ...matches.filter(
+            video => !existingIds.has(video.id)
+          )
+        ];
+      } else {
+        videos = matches;
+      }
+
+      nextPageToken = '';
     } catch (e) {
       error = e.message || 'Unable to load videos.';
     } finally {
@@ -54,10 +96,17 @@ return () => window.removeEventListener('scroll', handleScroll);
 
   let visibleVideos = $derived(
     [...videos].sort((a, b) => {
-      if (sortBy === 'views') return b.views - a.views;
-      if (sortBy === 'newest') {
-        return new Date(b.publishedAt) - new Date(a.publishedAt);
+      if (sortBy === 'views') {
+        return (b.views || 0) - (a.views || 0);
       }
+
+      if (sortBy === 'newest') {
+        return (
+          new Date(b.publishedAt || 0) -
+          new Date(a.publishedAt || 0)
+        );
+      }
+
       return 0;
     })
   );
@@ -68,12 +117,19 @@ return () => window.removeEventListener('scroll', handleScroll);
       : [...saved, id];
   }
 
-  function formatViews(n) {
-    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  function formatViews(n = 0) {
+    if (n >= 1e6) {
+      return (n / 1e6).toFixed(1) + 'M';
+    }
+
+    if (n >= 1e3) {
+      return (n / 1e3).toFixed(1) + 'K';
+    }
+
     return String(n);
   }
 </script>
+
 
 <svelte:head>
   <title>Vind - Video Search</title>
@@ -101,12 +157,6 @@ return () => window.removeEventListener('scroll', handleScroll);
       <span class="nav-count">{saved.length}</span>
     </button>
 
-    <p class="side-label second-label">INSIGHTS</p>
-    <button class="nav-item" onclick={() => {
-      sortBy = 'views';
-    }}>
-      <span>⌁</span> Performance
-    </button>
   </aside>
 
   <main class="main-area">
